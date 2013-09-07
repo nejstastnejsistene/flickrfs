@@ -113,7 +113,10 @@ class FStore(object):
         '''Deletes all user files while leaving the user's token intact'''
         for f in self.get_files():
             images = self.get_file_metadata(f).get('chunks')
-            self._delete(i[0] for i in images)
+            try:
+                self._delete(i[0] for i in images)
+            except FlickrError:
+                pass
 
         self.redis.delete(FILE_KEY.format(self.user))
 
