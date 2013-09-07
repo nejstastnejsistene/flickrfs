@@ -382,8 +382,8 @@ if __name__ == '__main__':
     fss = [ FlickrFS(NaiveEncoder((5, 5)), store, fstore)
           , FlickrFS(AlphaEncoder('favicon.jpg'), store, fstore)
           , FlickrFS(LowBitEncoder('favicon.jpg'), store, fstore)
-          #, FlickrFS(DoubleEncoder('favicon.jpg'), store, fstore)
-           , FlickrFS(StealthEncoder('favicon.jpg'), store)
+          # , FlickrFS(DoubleEncoder('favicon.jpg'), store, fstore)
+          , FlickrFS(StealthEncoder('favicon.jpg'), store, fstore)
           ]
     testfile = 'README.md'
     testfile2 = 'flickrfs.py'
@@ -394,4 +394,4 @@ if __name__ == '__main__':
         with open(fs[testfile]) as result, open(testfile) as control:
             assert result.read() == control.read()
         with open(fs[testfile2]) as result, open(testfile2) as control:
-            assert result.read() == control.read(), fs.encoder.__class__
+            assert result.read() == control.read(), fs.encoder.__class__.__name___
