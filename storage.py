@@ -1,42 +1,87 @@
 #!/usr/bin/env python
+# storage.py
 
 import sys
 import json
 import redis
+import os
+import requests
 
 from flickrapi import FlickrAPI
 
 class FStore(object):
 
-    def __init__(self):
-        self.flickr = FlickrAPI(os.environ.get('FLICKR_API_KEY'), os.environ.get('FLICKR_SECRET'), token=token)
+    def __init__(self, token):
+	api_key = os.environ.get('FLICKR_API_KEY')
+	api_secret = os.environ.get('FLICKR_SECRET')
+	assert api_key != None and api_secret != None
+        self.flickr = FlickrAPI(api_key, api_secret, token=token)
 
-    # TODO: Mike should modify _upload and _download to take in lists of images and photo_ids
-    #       and upload/download them all
+    # upload()
+    # takes a list of images and uploads to flickr
+    def _upload(self, img_list):
+	assert isinstance(img_list, list)
+	for img in img_list: 
+	    print 'uploading ' + img
+	    self.flickr.upload(img)
 
-    def _upload(self, image):
-        self.flickr.upload(image)
+    # download()
+    # takes a list of flickr photo ids and downloads them
+    # returns the absolute filepath
+    def _download(self, photo_ids):
+	assert isinstance(photo_ids, list)
+	flist = []
+	for pid in photo_ids:
+	    sizes = self.flickr.photos_getSizes(photo_id=pid)
+	    img = requests.get(sizes[0][-1].attrib['source'])
 
-    def _download(self, photo_id):
-        sizes = flickr.photos_getSize(photo_id=photo_id)
+	    # use the photo id as the file name
+	    with open(pid, 'w+') as f:
+		f.write(img.content)
 
-        original_url = [size.get('source') for size in sizes[0] if size.get('label') is 'Original'][0]
+	    # save the file path in our list
+	    flist.append( os.path.abspath(pid) )
+	
+	# return the list of fully-qualified pathnames
+	return flist
 
-        # TODO: Mike needs to use original_url to download the image and return the absolute filepath
+    # delete()
+    # takes a list of flickr photo ids and deletes them
+    def _delete(self, photo_ids):
+	assert isinstance(photo_ids, list)
+	for pid in photo_ids:
+	    print 'deleting ' + pid
+	    self.flickr.photos_delete(photo_id=pid)
 
 
 def print_usage():
     print 'usage: up_down.py [img]'
 
 def main():
-    if len(sys.argv) != 2:
-        print_usage()
-        sys.exit(1)
+    token = '72157635426291810-1cc633b8ce447829'
+    ffs = FStore(token)
 
-    img = sys.argv[1]
 
-    upload(tok, img)
-    search()
+    ########## upload photos ##########
+    photo_ids = ['9696283248', '9696282758']
+    ffs._delete(photo_ids)
+
+    '''
+    ########## download photos ##########
+    photo_ids = ['9693022251', '9695265660']
+    ffs._download(photo_ids)
+    '''
+
+    '''
+    ########## upload photos ##########
+    img_list  = ['images/flyingBrearJackassKills.png', 'images/sodaEffects.png',
+	    'images/franklinOnLife.png', 'images/stallman.png',
+	    'images/hardwarePoster.png', 'images/ubuntuJoke.png',
+	    'images/linuxFlowchart.png', 'images/watermelonMurder.png',
+	    'images/plagueDoctor.png']
+
+    ffs._upload(img_list)
+    '''
 
 if __name__ == '__main__':
     main()
