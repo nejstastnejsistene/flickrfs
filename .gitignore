@@ -41,3 +41,7 @@ env
 # Vagrant
 .vagrant
 Vagrantfile
+
+# Redis
+dump.rdb
+appendonly.aof
