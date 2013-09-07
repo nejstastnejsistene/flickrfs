@@ -3,14 +3,18 @@ import random
 import tempfile
 from PIL import Image
 
+from datastore import Datastore
+
 
 def mktemp():
     return tempfile.mktemp(prefix='flickrfs_')
 
 class FlickrFS(object):
 
-    def __init__(self, enc_cls, *args):
-        self.enc = enc_cls(*args) # FIXME
+    def __init__(self, encoder, store):
+        self.encoder = encoder
+        self.store = store
+        # TODO read this from the store.
         self.files = {}
         self.current_blob = None
         self.current_blob_id = None
@@ -19,7 +23,7 @@ class FlickrFS(object):
     def __getitem__(self, key):
         if isinstance(key, basestring):
             # Retrive a file.
-            return self.enc.decode(*self.files[key])
+            return self.encoder.decode(*self.files[key])
 
     def add(self, filename):
         for filename, blob_id in self.append(filename):
@@ -30,6 +34,14 @@ class FlickrFS(object):
             #   update blog_id
             # os.ulink(filename)
 
+        # Save the metadata.
+        self.store.put_file_metadata(filename, {
+            'files': self.files,
+            'current_blob': self.current_blob,
+            'current_blob_id': self.current_blob_id,
+            'current_offset': self.current_offset,
+            })
+
     def append(self, filename):
         '''Yield tuples containing (blob_filename, blob_id),
            where blob_filename is encoded as a PNG file.'''
@@ -38,7 +50,7 @@ class FlickrFS(object):
         self.files[filename] = []
         for blob_filename, blob_id in self._append(filename):
             # A simple png encoding layer on top of _append.
-            tmp = self.enc.encode(blob_filename) 
+            tmp = self.encoder.encode(blob_filename) 
             yield tmp, blob_id
             self.files[filename][-1][0] = tmp # FIXME
             # Delete the intermediate blob.
@@ -55,7 +67,7 @@ class FlickrFS(object):
                 # Append to the blob.
                 with open(self.current_blob, 'w+') as blob:
                     blob.seek(self.current_offset)
-                    n = self.enc.chunk_size - self.current_offset
+                    n = self.encoder.chunk_size - self.current_offset
                     chunk = data.read(n)
                     if not chunk:
                         break
@@ -67,7 +79,7 @@ class FlickrFS(object):
 
                     # Update the offset.
                     self.current_offset += len(chunk)
-                    self.current_offset %= self.enc.chunk_size
+                    self.current_offset %= self.encoder.chunk_size
 
                 yield self.current_blob, self.current_blob_id
 
@@ -123,7 +135,7 @@ class PngEncoder(object):
 class NaiveEncoder(PngEncoder):
     '''Encodes data space-efficiently in grayscale PNGs.'''
 
-    default_size = 2**14, 2**13 # 128MB
+    default_size = 2**10, 2**10 # 1MB
 
     def _create_image(self):
         return Image.new('P', self.size)
@@ -211,12 +223,14 @@ class LowBitEncoder(PngEncoder):
 
 if __name__ == '__main__':
     import StringIO
-    fss = [ FlickrFS(NaiveEncoder, (5, 5))
-          , FlickrFS(AlphaEncoder, '23559_kitten_halftime_0131.jpg')
-          , FlickrFS(LowBitEncoder, 'evercats_breaded_cats_000_44.jpg')
+    store = Datastore('test')
+    fss = [ FlickrFS(NaiveEncoder((5, 5)), store)
+          , FlickrFS(AlphaEncoder('favicon.jpg'), store)
+          , FlickrFS(LowBitEncoder('favicon.jpg'), store)
           ]
     testfile = 'README.md'
     for fs in fss:
+        store.clear()
         fs.add(testfile)
         with open(fs[testfile]) as result, open(testfile) as control:
             assert result.read() == control.read()
