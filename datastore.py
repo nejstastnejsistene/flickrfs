@@ -53,4 +53,4 @@ class Datastore(object):
 
     def get_files(self, user_id=None):
         '''Returns list of users filenames'''
-        return self.redis.hkeys(FILE_KEY.format(user_id or self.user))
+        return self.redis.keys(FILE_KEY.format(user_id or self.user))

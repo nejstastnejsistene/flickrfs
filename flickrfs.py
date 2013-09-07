@@ -4,6 +4,7 @@ import tempfile
 from PIL import Image
 
 from datastore import Datastore
+from storage import FStore
 
 
 def mktemp():
@@ -11,82 +12,89 @@ def mktemp():
 
 class FlickrFS(object):
 
-    def __init__(self, encoder, store):
+    def __init__(self, encoder, store, fstore):
         self.encoder = encoder
         self.store = store
-        # TODO read this from the store.
-        metadata = store.get_files_metadata()
-        self.files = metadata.get('files', {})
-        self.current_blob  = metadata.get('current_blob')
-        self.current_blob_id = metadata.get('current_blob_id')
-        self.current_offset = metadata.get('current_offset', 0)
+        self.fstore = fstore
+        self.files = store.get_files_metadata()
+
+    def _clear(self):
+        '''For debugging'''
+        self.store.clear()
+        self.files = store.get_files_metadata()
 
     def __getitem__(self, key):
         if isinstance(key, basestring):
             # Retrive a file.
-            return self.encoder.decode(*self.files[key])
+            return self.encoder.decode(*self.files[key]['chunks'])
 
     def add(self, filename):
-        for filename, blob_id in self.append(filename):
-            print 'uploading', filename, 'to', blob_id
-            # if blob_id is None
-            #   create new file in flickr and save the blob_id
-            # else
-            #   update blog_id
-            # os.ulink(filename)
+        if filename in self.files:
+            raise KeyError, "file '{}' already exists".format(filename)
+        self.files[filename] = {}
+        self.files[filename]['chunks'] = []
+        chunks = []
+        for png_file, blob_id in self.append(filename):
+            print 'uploading', png_file, 'to', blob_id
+            #if blob_id is not None
+            #    fstore._delete(blob_id)
+            #blob_id, = fstore._upload([filename])
+            blob_id = png_file # Remove this when flickr gets integrated
+            fdata = self.files[filename]['chunks'].pop(0)
+            chunks.append([blob_id] + fdata[1:])
+            #os.unlink(filename)
 
         # Save the metadata.
-        self.store.put_files_metadata({
-            'files': self.files,
-            'current_blob': self.current_blob,
-            'current_blob_id': self.current_blob_id,
-            'current_offset': self.current_offset,
-            })
+        self.files[filename]['chunks'] = chunks
+        self.store.put_files_metadata(filename, self.files[filename])
 
     def append(self, filename):
         '''Yield tuples containing (blob_filename, blob_id),
            where blob_filename is encoded as a PNG file.'''
-        if filename in self.files:
-            raise KeyError, "file '{}' already exists".format(filename)
-        self.files[filename] = []
         for blob_filename, blob_id in self._append(filename):
             # A simple png encoding layer on top of _append.
             tmp = self.encoder.encode(blob_filename) 
             yield tmp, blob_id
-            self.files[filename][-1][0] = tmp # FIXME
+            #self.files[filename][-1][0] = tmp # FIXME
             # Delete the intermediate blob.
             os.unlink(blob_filename)
 
     def _append(self, filename):
         '''Yield tuples containing (blob_filename, blob_id).'''
+        current_blob = self.files[filename].get('current_blob')
+        current_blob_id = self.files[filename].get('current_blob_id')
+        current_offset = self.files[filename].get('current_offset', 0)
         with open(filename) as data:
             while True:
                 # Use a new temp file if no blob is specified.
-                if self.current_blob is None:
-                    self.current_blob = mktemp()
+                if current_blob is None:
+                    current_blob = mktemp()
 
                 # Append to the blob.
-                with open(self.current_blob, 'w+') as blob:
-                    blob.seek(self.current_offset)
-                    n = self.encoder.chunk_size - self.current_offset
+                with open(current_blob, 'w+') as blob:
+                    blob.seek(current_offset)
+                    n = self.encoder.chunk_size - current_offset
                     chunk = data.read(n)
                     if not chunk:
                         break
                     blob.write(chunk)
 
                     # Append this chunk to the filename.
-                    self.files[filename].append([self.current_blob_id,
-                        self.current_offset, len(chunk)])
+                    self.files[filename]['chunks'].append(
+                        [current_blob_id, current_offset, len(chunk)])
 
                     # Update the offset.
-                    self.current_offset += len(chunk)
-                    self.current_offset %= self.encoder.chunk_size
+                    current_offset += len(chunk)
+                    current_offset %= self.encoder.chunk_size
 
-                yield self.current_blob, self.current_blob_id
+                yield current_blob, current_blob_id
 
-                if self.current_offset == 0:
-                    self.current_blob = None
-                    self.current_blob_id = None
+                if current_offset == 0:
+                    current_blob = None
+                    current_blob_id = None
+        self.files[filename]['current_blob'] = current_blob
+        self.files[filename]['current_blob_id'] = current_blob_id
+        self.files[filename]['current_offset'] = current_offset
 
 
 class PngEncoder(object):
@@ -370,15 +378,20 @@ class StealthEncoder(PngEncoder):
 if __name__ == '__main__':
     import StringIO
     store = Datastore('test')
-    fss = [ FlickrFS(NaiveEncoder((5, 5)), store)
-          , FlickrFS(AlphaEncoder('favicon.jpg'), store)
-          , FlickrFS(LowBitEncoder('favicon.jpg'), store)
-          , FlickrFS(DoubleEncoder('favicon.jpg'), store)
-          , FlickrFS(StealthEncoder('favicon.jpg'), store)
+    fstore = FStore('token')
+    fss = [ FlickrFS(NaiveEncoder((5, 5)), store, fstore)
+          , FlickrFS(AlphaEncoder('favicon.jpg'), store, fstore)
+          , FlickrFS(LowBitEncoder('favicon.jpg'), store, fstore)
+          #, FlickrFS(DoubleEncoder('favicon.jpg'), store, fstore)
+           , FlickrFS(StealthEncoder('favicon.jpg'), store)
           ]
     testfile = 'README.md'
+    testfile2 = 'flickrfs.py'
     for fs in fss:
-        store.clear()
+        fs._clear()
         fs.add(testfile)
+        fs.add('flickrfs.py')
         with open(fs[testfile]) as result, open(testfile) as control:
             assert result.read() == control.read()
+        with open(fs[testfile2]) as result, open(testfile2) as control:
+            assert result.read() == control.read(), fs.encoder.__class__
