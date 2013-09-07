@@ -9,15 +9,24 @@ import requests
 
 from flickrapi import FlickrAPI
 
+URL = 'http://fuflickr.cloudapp.net'
+NAME = 'FlickrFS'
 FILE_KEY = '{0}|files'
 
 class FStore(object):
 
-    def __init__(self, token):
+    def __init__(self, user_id=None):
         api_key = os.environ.get('FLICKR_API_KEY')
         api_secret = os.environ.get('FLICKR_SECRET')
-        assert api_key != None and api_secret != None
-        self.flickr = FlickrAPI(api_key, api_secret, token=token)
+
+        if not api_key or not api_secret:
+            raise ValueError('API credentials not available. Check for FLICKR_API_KEY and FLICKR_SECRET env variables')
+
+        if not user_id:
+            raise ValueError('User not specified or not in database. Please visit {0} to register for {1}'.format(URL, NAME))
+        self.user = user_id
+        self.redis = redis.StrictRedis(host=URL)
+        self.flickr = FlickrAPI(api_key, api_secret, token=self.get_profile().get('token'))
 
     def _upload(self, img_list):
         '''Takes a list of images and uploads to flickr, returning the photo_ids'''
@@ -56,6 +65,48 @@ class FStore(object):
         for pid in photo_ids:
             # print 'deleting ' + pid
             self.flickr.photos_delete(photo_id=pid)
+
+    def get_profile(self):
+        '''Returns a python dict of users profile data'''
+        return self.redis.hgetall(self.user)
+
+    def put_profile(self, profile):
+        '''Updates the user's profile with the given information
+
+        Note that setting a field to None will remove that field from the profile'''
+
+        old_profile = self.get_profile()
+        old_profile.update(profile)
+        for k, v in old_profile.items():
+            if v:
+                self.redis.hset(self.user, k, v)
+            else:
+                self.redis.hdel(self.user, k)
+
+        return True
+
+    def get_file_metadata(self, filename):
+        '''Returns a python dict of metadata for the given file'''
+        return json.loads(self.redis.hget(FILE_KEY.format(self.user), filename))
+
+    def put_files_metadata(self, filename, metadata):
+        '''Updates the filename metadata with the given information
+
+        Note that setting a field to None will remove that field from the profile'''
+        old_metadata = self.get_file_metadata(filename)
+        old_metadata.update(metadata)
+        new_metadata = {k: v for k, v in old_metadata if v is not None}
+        self.redis.hset(FILE_KEY.format(self.user), filename, json.dumps(new_metadata))
+        return True
+
+    def get_files(self):
+        '''Returns list of users filenames'''
+        return self.redis.hkeys(FILE_KEY.format(self.user))
+
+    def delete_user(self):
+        '''Removes a user's metadata'''
+        self.redis.delete(self.user)
+        self.redis.delete(FILE_KEY.format(self.user))
 
 
 def print_usage():
