@@ -124,6 +124,7 @@ class AlphaEncoder(PngEncoder):
         width, height = img.size
         for x in range(width):
             for y in range(height):
+                #print "acoord:", x, y
                 try:
                     alpha = ord(data[x * height + y])
                 except IndexError:
@@ -183,6 +184,63 @@ class LowBitEncoder(PngEncoder):
 
 
 
+class DoubleEncoder(PngEncoder):
+    '''Save the data in the alpha pixels and the rgb values of an image.'''
+
+    def __init__(self, base_image):
+        base_image = Image.open(base_image)
+        width , height = base_image.size
+        # we need to lie about the image size in order to get enough data
+        PngEncoder.__init__(self, (2*width, height))
+        self.base_image = base_image.load()
+
+    def _create_image(self):
+        return Image.new('RGBA', self.size)
+
+    def _encode_data(self, img, data):
+        bitmap = img.load()
+        width, height = img.size
+        #print "encoding..."
+        for x in range(width/2):
+            for y in range(height):
+                #print "coords:", x, y
+                try:
+                    byte_to_add = ord(data[x * height*2 + y*2])
+                except IndexError:
+                    byte_to_add = random.getrandbits(8)
+
+                r_dat = byte_to_add >> 6
+                g_dat = (byte_to_add >> 3) & 0b111
+                b_dat = byte_to_add & 0b111
+                
+                r_val = (self.base_image[x , y][0] & 0b1111100) | (r_dat)
+                g_val = (self.base_image[x , y][1] & 0b1111000) | (g_dat)
+                b_val = (self.base_image[x , y][2] & 0b1111000) | (b_dat)
+                
+                try:
+                    alpha = ord(data[x * height*2 + y*2 + 1])
+                except IndexError:
+                    alpha = random.getrandbits(8)
+
+                #print alpha
+                bitmap[x, y] = (r_val, g_val, b_val, alpha)
+
+
+    def _decode_data(self, out, img, start, end):
+        bitmap = img.load()
+        height = img.size[1]
+        end = start+(end-start)/2
+        #print "decoding..."
+        for i in range(start, end):
+            x, y =  divmod(i, height)
+            color_vals = bitmap[x,y]
+            from_r = color_vals[0] & 0b11
+            from_g = color_vals[1] & 0b111
+            from_b = color_vals[2] & 0b111
+            recovered_byte = (from_r << 6) | (from_g << 3) | (from_b)
+            out.write(chr(recovered_byte))
+            out.write(chr(bitmap[x, y][3]))
+
 
 
 if __name__ == '__main__':
@@ -190,6 +248,7 @@ if __name__ == '__main__':
     fss = [ FlickrFS(NaiveEncoder, (5, 5))
           , FlickrFS(AlphaEncoder, 'favicon.jpg')
           , FlickrFS(LowBitEncoder, 'favicon.jpg')
+          , FlickrFS(DoubleEncoder, 'favicon.jpg')
           ]
     for fs in fss:
         result = StringIO.StringIO()
@@ -206,6 +265,7 @@ if __name__ == '__main__':
             # Update metadata.
             last_blob = tmp
             last_offset = fs.current_offset
+            #print result.getvalue()
         with open('README.md') as f:
             assert f.read() == result.getvalue(), 'It does not work :O'
             print fs.enc.__class__.__name__, 'works! :D'
