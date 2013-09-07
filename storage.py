@@ -30,7 +30,6 @@ class FStore(object):
 
     def _upload(self, img_list):
         '''Takes a list of images and uploads to flickr, returning the photo_ids'''
-        assert isinstance(img_list, list)
         pid_list = []
         for img in img_list:
             # print 'uploading ' + img
@@ -43,7 +42,6 @@ class FStore(object):
         '''Takes a list of flickr photo_ids and downloads them
 
         Returns the absolute filepath'''
-        assert isinstance(photo_ids, list)
         flist = []
         for pid in photo_ids:
             sizes = self.flickr.photos_getSizes(photo_id=pid)
@@ -61,7 +59,6 @@ class FStore(object):
 
     def _delete(self, photo_ids):
         '''Takes a list of flickr photo_ids and deletes them'''
-        assert isinstance(photo_ids, list)
         for pid in photo_ids:
             # print 'deleting ' + pid
             self.flickr.photos_delete(photo_id=pid)
@@ -108,13 +105,18 @@ class FStore(object):
         return self.redis.hgetall(FILE_KEY.format(self.user))
 
     def delete_user(self):
-        '''Removes a user's metadata'''
+        '''Removes all data associated with a user'''
+        self.delete_user_files()
         self.redis.delete(self.user)
+
+    def delete_user_files(self):
+        '''Deletes all user files while leaving the user's token intact'''
+        for f in self.get_files():
+            images = self.get_file_metadata(f).get('chunks')
+            self._delete(i[0] for i in images)
+
         self.redis.delete(FILE_KEY.format(self.user))
 
-
-def print_usage():
-    print 'usage: up_down.py [img]'
 
 def main():
     token = '72157635426291810-1cc633b8ce447829'
