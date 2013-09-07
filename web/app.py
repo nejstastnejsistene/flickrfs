@@ -3,7 +3,7 @@
 import os
 
 from flickrapi import FlickrAPI
-from datastore import Datastore
+from storage import FStore
 
 from flask import Flask
 from flask import redirect
@@ -25,14 +25,14 @@ def flickr_callback():
     uid = user_xml.attrib.get('id','')
     username = user_xml[0].text
 
-    db.put_profile({'token': token, 'uid': uid}, username)
+    db = FStore(username)
+    db.put_profile({'token': token, 'uid': uid})
     return redirect('http://github.com/brcooley/pennapps')
 
 if __name__ == '__main__':
     api_key = os.environ.get('FLICKR_API_KEY','')
     api_secret = os.environ.get('FLICKR_SECRET','')
     flickr = FlickrAPI(api_key, api_secret)
-    db = Datastore()
 
     print 'Starting flask'
     app.run(host='0.0.0.0', port=8080, debug=True)
