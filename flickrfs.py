@@ -304,11 +304,15 @@ if __name__ == '__main__':
     fss = [ FlickrFS(NaiveEncoder((5, 5)), store, fstore)
           , FlickrFS(AlphaEncoder('favicon.jpg'), store, fstore)
           , FlickrFS(LowBitEncoder('favicon.jpg'), store, fstore)
-          , FlickrFS(DoubleEncoder('favicon.jpg'), store, fstore)
+          #, FlickrFS(DoubleEncoder('favicon.jpg'), store, fstore)
           ]
     testfile = 'README.md'
+    testfile2 = 'flickrfs.py'
     for fs in fss:
         fs._clear()
         fs.add(testfile)
+        fs.add('flickrfs.py')
         with open(fs[testfile]) as result, open(testfile) as control:
             assert result.read() == control.read()
+        with open(fs[testfile2]) as result, open(testfile2) as control:
+            assert result.read() == control.read(), fs.encoder.__class__
