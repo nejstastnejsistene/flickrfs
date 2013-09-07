@@ -9,7 +9,7 @@ class Datastore(object):
 
     def __init__(self, user_id):
         self.user_id = user_id
-        self.redis = redis.StrictRedis()
+        self.redis = redis.StrictRedis(host='fuflickr.cloudapp.net')
         self.user = user_id
 
     def clear(self, user_id=None):
