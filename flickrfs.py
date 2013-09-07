@@ -15,10 +15,11 @@ class FlickrFS(object):
         self.encoder = encoder
         self.store = store
         # TODO read this from the store.
-        self.files = {}
-        self.current_blob = None
-        self.current_blob_id = None
-        self.current_offset = 0
+        metadata = store.get_files_metadata()
+        self.files = metadata.get('files', {})
+        self.current_blob  = metadata.get('current_blob')
+        self.current_blob_id = metadata.get('current_blob_id')
+        self.current_offset = metadata.get('current_offset', 0)
 
     def __getitem__(self, key):
         if isinstance(key, basestring):
@@ -35,7 +36,7 @@ class FlickrFS(object):
             # os.ulink(filename)
 
         # Save the metadata.
-        self.store.put_file_metadata(filename, {
+        self.store.put_files_metadata({
             'files': self.files,
             'current_blob': self.current_blob,
             'current_blob_id': self.current_blob_id,
@@ -288,7 +289,6 @@ class DoubleEncoder(PngEncoder):
             out.write(chr(bitmap[x, y][3]))
 
 
-
 if __name__ == '__main__':
     import StringIO
     store = Datastore('test')
@@ -303,4 +303,3 @@ if __name__ == '__main__':
         fs.add(testfile)
         with open(fs[testfile]) as result, open(testfile) as control:
             assert result.read() == control.read()
-

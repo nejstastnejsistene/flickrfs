@@ -37,19 +37,18 @@ class Datastore(object):
 
         return True
 
-    def get_file_metadata(self, filename, user_id=None):
-        '''Returns a python dict of metadata for the given filename'''
-        return json.loads(self.redis.hget(FILE_KEY.format(user_id or self.user), filename) or '{}')
+    def get_files_metadata(self, user_id=None):
+        '''Returns a python dict of metadata for all files'''
+        key = FILE_KEY.format(user_id or self.user)
+        return json.loads(self.redis.get(FILE_KEY.format(key)) or '{}')
 
-    def put_file_metadata(self, filename, metadata, user_id=None):
-        '''Updates the filename metadata with the given information
-
-        Note that setting a field to None will remove that field from the metadata'''
-
-        user_id = user_id or self.user
-        old_metadata = self.get_file_metadata(user_id, filename)
-        old_metadata.update(metadata)
-        self.redis.hset(FILE_KEY.format(self.user_id), filename, json.dumps({k: v for k, v in old_metadata.items() if v is not None}))
+    def put_files_metadata(self, metadata, user_id=None):
+        '''Updates the filename metadata with the given information'''
+        #user_id = user_id or self.user
+        #old_metadata = self.get_files_metadata(user_id, filename)
+        #old_metadata.update(metadata)
+        self.redis.set(FILE_KEY.format(user_id or self.user),
+                       json.dumps(metadata))
         return True
 
     def get_files(self, user_id=None):
