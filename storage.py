@@ -8,6 +8,7 @@ import redis
 import requests
 
 from flickrapi import FlickrAPI
+from flickrapi.exceptions import FlickrError
 
 URL = 'fuflickr.cloudapp.net'
 NAME = 'FlickrFS'
