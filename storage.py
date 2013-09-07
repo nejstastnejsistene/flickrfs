@@ -84,7 +84,7 @@ class FStore(object):
 
     def get_file_metadata(self, filename):
         '''Returns a python dict of metadata for the given file'''
-        return json.loads(self.redis.hget(FILE_KEY.format(self.user), filename))
+        return json.loads(self.redis.hget(FILE_KEY.format(self.user), filename) or '{}')
 
     def put_files_metadata(self, filename, metadata):
         '''Updates the filename metadata with the given information
