@@ -36,7 +36,7 @@ class FStore(object):
 
             # use the photo id as the file name
             with open(pid, 'w+') as f:
-            f.write(img.content)
+                f.write(img.content)
 
             # save the file path in our list
             flist.append(os.path.abspath(pid))
