@@ -90,9 +90,8 @@ class NaiveEncoder(PngEncoder):
     def _decode_data(self, out, img, start, end):
         out.write(img.tostring()[start:end])
 
-
 class AlphaEncoder(PngEncoder):
-    '''Save the image in the alpha pixels of an image.'''
+    '''Save the data in the alpha pixels of an image.'''
 
     def __init__(self, base_image):
         base_image = Image.open(base_image)
@@ -120,11 +119,59 @@ class AlphaEncoder(PngEncoder):
             x, y =  divmod(i, height)
             out.write(chr(bitmap[x, y][3]))
 
+class LowBitEncoder(PngEncoder):
+    '''save data in the low bits of the color values '''
+
+    def __init__(self, base_image):
+        base_image = Image.open(base_image)
+        PngEncoder.__init__(self, base_image.size)
+        self.base_image = base_image.load()
+
+    def _create_image(self):
+        return Image.new('RGB', self.size)
+
+    def _encode_data(self, img, data):
+        bitmap = img.load()
+        width, height = img.size
+        for x in range(width):
+            for y in range(height):
+                try:
+                    byte_to_add = ord(data[x * height + y])
+                    
+                except IndexError:
+                    byte_to_add = random.getrandbits(8)
+
+                r_dat = byte_to_add >> 6
+                g_dat = (byte_to_add >> 3) & 0b111
+                b_dat = byte_to_add & 0b111
+                
+                r_val = (self.base_image[x , y][0] & 0b1111100) | (r_dat)
+                g_val = (self.base_image[x , y][1] & 0b1111000) | (g_dat)
+                b_val = (self.base_image[x , y][2] & 0b1111000) | (b_dat)
+                
+                bitmap[x, y] = (r_val, g_val, b_val)
+
+    def _decode_data(self, out, img, start, end):
+        bitmap = img.load()
+        height = img.size[1]
+        for i in range(start, end):
+            x, y =  divmod(i, height)
+            color_vals = bitmap[x,y]
+            from_r = color_vals[0] & 0b11
+            from_g = color_vals[1] & 0b111
+            from_b = color_vals[2] & 0b111
+            recovered_byte = (from_r << 6) | (from_g << 3) | (from_b)
+            out.write(chr(recovered_byte))
+
+
+
+
 
 if __name__ == '__main__':
     import StringIO
     fss = [ FlickrFS(NaiveEncoder, (5, 5))
           , FlickrFS(AlphaEncoder, 'favicon.jpg')
+          , FlickrFS(LowBitEncoder, 'favicon.jpg')
           ]
     for fs in fss:
         result = StringIO.StringIO()
