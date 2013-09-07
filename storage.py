@@ -115,7 +115,7 @@ class FStore(object):
         for f in self.get_files():
             images = self.get_file_metadata(f).get('chunks')
             try:
-                self._delete(i[0] for i in images)
+                self._delete([i[0] for i in images])
             except FlickrError:
                 pass
 
