@@ -1,32 +1,28 @@
 import os
 import random
-import tempfile
 from PIL import Image
 
-from datastore import Datastore
-from storage import FStore
+from storage import FStore, mktemp
 
-
-def mktemp():
-    return tempfile.mktemp(prefix='flickrfs_')
 
 class FlickrFS(object):
 
-    def __init__(self, encoder, store, fstore):
+    def __init__(self, encoder, store):
         self.encoder = encoder
         self.store = store
-        self.fstore = fstore
-        self.files = store.get_files_metadata()
+        self.files = self.store.get_files_metadata()
 
     def _clear(self):
         '''For debugging'''
-        self.store.clear()
-        self.files = store.get_files_metadata()
+        self.store.delete_user_files()
+        self.files = self.store.get_files_metadata()
 
     def __getitem__(self, key):
         if isinstance(key, basestring):
             # Retrive a file.
-            return self.encoder.decode(*self.files[key]['chunks'])
+            chunks = [(self.store._download((blob_id,))[0], a, b)
+                        for blob_id, a, b in self.files[key]['chunks']]
+            return self.encoder.decode(*chunks)
 
     def add(self, filename):
         if filename in self.files:
@@ -35,18 +31,16 @@ class FlickrFS(object):
         self.files[filename]['chunks'] = []
         chunks = []
         for png_file, blob_id in self.append(filename):
-            print 'uploading', png_file, 'to', blob_id
-            #if blob_id is not None
-            #    fstore._delete(blob_id)
-            #blob_id, = fstore._upload([filename])
-            blob_id = png_file # Remove this when flickr gets integrated
+            if blob_id is not None:
+                self.store._delete(blob_id)
+            blob_id, = self.store._upload([png_file])
             fdata = self.files[filename]['chunks'].pop(0)
             chunks.append([blob_id] + fdata[1:])
-            #os.unlink(filename)
+            os.unlink(png_file)
 
         # Save the metadata.
         self.files[filename]['chunks'] = chunks
-        self.store.put_files_metadata(filename, self.files[filename])
+        self.store.put_file_metadata(filename, self.files[filename])
 
     def append(self, filename):
         '''Yield tuples containing (blob_filename, blob_id),
@@ -172,7 +166,6 @@ class AlphaEncoder(PngEncoder):
         width, height = img.size
         for x in range(width):
             for y in range(height):
-                #print "acoord:", x, y
                 try:
                     alpha = ord(data[x * height + y])
                 except IndexError:
@@ -250,11 +243,9 @@ class DoubleEncoder(PngEncoder):
     def _encode_data(self, img, data):
         bitmap = img.load()
         width, height = img.size
-        #print "encoding..."
         for x in range(width/2):
             for y in range(height):
                 ran_out = False
-                #print "coords:", x, y
                 try:
                     byte_to_add = ord(data[x * height*2 + y*2])
                 except IndexError:
@@ -275,7 +266,6 @@ class DoubleEncoder(PngEncoder):
                     alpha = random.getrandbits(8)
                     ran_out = True
 
-                #print alpha
                 bitmap[x, y] = (r_val, g_val, b_val, alpha)
                 if ran_out:
                     return
@@ -285,7 +275,6 @@ class DoubleEncoder(PngEncoder):
         bitmap = img.load()
         height = img.size[1]
         end = start+(end-start)/2
-        #print "decoding..."
         for i in range(start, end):
             x, y =  divmod(i, height)
             color_vals = bitmap[x,y]
@@ -312,7 +301,6 @@ class AlphaEncoder(PngEncoder):
         width, height = img.size
         for x in range(width):
             for y in range(height):
-                #print "acoord:", x, y
                 try:
                     alpha = ord(data[x * height + y])
                 except IndexError:
@@ -344,7 +332,6 @@ class StealthEncoder(PngEncoder):
         width, height = img.size
         for x in range(width):
             for y in range(height):
-                #print "acoord:", x, y
                 try:
                     alpha = ord(data[x * height + y])
                     adj_r = (255.0/alpha)*(self.base_image[x,y][0] + alpha - 255)
@@ -377,13 +364,12 @@ class StealthEncoder(PngEncoder):
 
 if __name__ == '__main__':
     import StringIO
-    store = Datastore('test')
-    fstore = FStore('token')
-    fss = [ FlickrFS(NaiveEncoder((5, 5)), store, fstore)
-          , FlickrFS(AlphaEncoder('favicon.jpg'), store, fstore)
-          , FlickrFS(LowBitEncoder('favicon.jpg'), store, fstore)
-          # , FlickrFS(DoubleEncoder('favicon.jpg'), store, fstore)
-          , FlickrFS(StealthEncoder('favicon.jpg'), store, fstore)
+    store = FStore('nejstastnejsistene')
+    fss = [ FlickrFS(NaiveEncoder((50, 50)), store)
+          , FlickrFS(AlphaEncoder('favicon.jpg'), store)
+          , FlickrFS(LowBitEncoder('favicon.jpg'), store)
+          # , FlickrFS(DoubleEncoder('favicon.jpg'), store)
+          , FlickrFS(StealthEncoder('favicon.jpg'), store)
           ]
     testfile = 'README.md'
     testfile2 = 'flickrfs.py'

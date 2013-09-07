@@ -6,13 +6,20 @@ import sys
 import json
 import redis
 import requests
+import tempfile
 
 from flickrapi import FlickrAPI
 from flickrapi.exceptions import FlickrError
 
+
 URL = 'fuflickr.cloudapp.net'
 NAME = 'FlickrFS'
 FILE_KEY = '{0}|files'
+
+
+def mktemp():
+    return tempfile.mktemp(prefix='flickrfs_')
+
 
 class FStore(object):
 
@@ -49,11 +56,12 @@ class FStore(object):
             img = requests.get(sizes[0][-1].attrib['source'])
 
             # use the photo id as the file name
-            with open(pid, 'w+') as f:
+            fname = mktemp()
+            with open(fname, 'w+') as f:
                 f.write(img.content)
 
             # save the file path in our list
-            flist.append(os.path.abspath(pid))
+            flist.append(os.path.abspath(fname))
 
         # return the list of fully-qualified pathnames
         return flist
@@ -87,13 +95,13 @@ class FStore(object):
         '''Returns a python dict of metadata for the given file'''
         return json.loads(self.redis.hget(FILE_KEY.format(self.user), filename) or '{}')
 
-    def put_files_metadata(self, filename, metadata):
+    def put_file_metadata(self, filename, metadata):
         '''Updates the filename metadata with the given information
 
         Note that setting a field to None will remove that field from the profile'''
         old_metadata = self.get_file_metadata(filename)
         old_metadata.update(metadata)
-        new_metadata = {k: v for k, v in old_metadata if v is not None}
+        new_metadata = {k: v for k, v in old_metadata.items() if v is not None}
         self.redis.hset(FILE_KEY.format(self.user), filename, json.dumps(new_metadata))
         return True
 
