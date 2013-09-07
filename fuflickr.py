@@ -3,6 +3,8 @@
 from argparse import ArgumentParser
 
 def upload(args):
+    # This should use funcitons defined in a flickr interface module along with the metadata stuff from datastore
+    # to upload files in the correct places after running them through the data2png type scripts
     pass
 
 def download(args):
