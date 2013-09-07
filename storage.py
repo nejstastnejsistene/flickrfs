@@ -9,6 +9,8 @@ import requests
 
 from flickrapi import FlickrAPI
 
+FILE_KEY = '{0}|files'
+
 class FStore(object):
 
     def __init__(self, token):
@@ -18,11 +20,15 @@ class FStore(object):
         self.flickr = FlickrAPI(api_key, api_secret, token=token)
 
     def _upload(self, img_list):
-        '''Takes a list of images and uploads to flickr'''
+        '''Takes a list of images and uploads to flickr, returning the photo_ids'''
         assert isinstance(img_list, list)
+        pid_list = []
         for img in img_list:
             # print 'uploading ' + img
-            self.flickr.upload(img)
+            pid = self.flickr.upload(img)[0]
+            pid_list.append(pid.text)
+
+        return pid_list
 
     def _download(self, photo_ids):
         '''Takes a list of flickr photo_ids and downloads them
