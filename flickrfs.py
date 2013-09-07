@@ -155,7 +155,8 @@ class AlphaEncoder(PngEncoder):
                 try:
                     alpha = ord(data[x * height + y])
                 except IndexError:
-                    alpha = random.getrandbits(8)
+                    #alpha = random.getrandbits(8)
+                    return
                 bitmap[x, y] = self.base_image[x, y] + (alpha,)
 
     def _decode_data(self, out, img, start, end):
@@ -185,7 +186,8 @@ class LowBitEncoder(PngEncoder):
                     byte_to_add = ord(data[x * height + y])
                     
                 except IndexError:
-                    byte_to_add = random.getrandbits(8)
+                    #byte_to_add = random.getrandbits(8)
+                    return
 
                 r_dat = byte_to_add >> 6
                 g_dat = (byte_to_add >> 3) & 0b111
@@ -230,11 +232,13 @@ class DoubleEncoder(PngEncoder):
         #print "encoding..."
         for x in range(width/2):
             for y in range(height):
+                ran_out = False
                 #print "coords:", x, y
                 try:
                     byte_to_add = ord(data[x * height*2 + y*2])
                 except IndexError:
                     byte_to_add = random.getrandbits(8)
+                    return
 
                 r_dat = byte_to_add >> 6
                 g_dat = (byte_to_add >> 3) & 0b111
@@ -248,9 +252,12 @@ class DoubleEncoder(PngEncoder):
                     alpha = ord(data[x * height*2 + y*2 + 1])
                 except IndexError:
                     alpha = random.getrandbits(8)
+                    ran_out = True
 
                 #print alpha
                 bitmap[x, y] = (r_val, g_val, b_val, alpha)
+                if ran_out:
+                    return
 
 
     def _decode_data(self, out, img, start, end):
@@ -272,10 +279,10 @@ class DoubleEncoder(PngEncoder):
 
 if __name__ == '__main__':
     import StringIO
-    fss = [ FlickrFS(NaiveEncoder, (5, 5))
-          , FlickrFS(AlphaEncoder, 'favicon.jpg')
-          , FlickrFS(LowBitEncoder, 'favicon.jpg')
-          , FlickrFS(DoubleEncoder, 'favicon.jpg')
+    fss = [ FlickrFS(NaiveEncoder, (5,5))
+          , FlickrFS(AlphaEncoder, '../backpics/puppy1.jpg')
+          , FlickrFS(LowBitEncoder, '../backpics/puppy1.jpg')
+          , FlickrFS(DoubleEncoder, '../backpics/puppy1.jpg')
           ]
     testfile = 'README.md'
     for fs in fss:
