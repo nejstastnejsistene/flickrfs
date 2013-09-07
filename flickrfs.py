@@ -1,6 +1,6 @@
 import tempfile
 
-CHUNK_SIZE = 2**27 # 128MB
+CHUNK_SIZE = 2**25 # 32MB
 
 class FlickrFS(object):
 
