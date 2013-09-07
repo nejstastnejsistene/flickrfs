@@ -11,11 +11,13 @@ class FlickrFS(object):
 
     def __init__(self, enc_cls, *args):
         self.enc = enc_cls(*args) # FIXME
+        self.current_blob = None
+        self.current_offset = 0
 
-    def append(self, *args):
+    def append(self, filename):
         '''Yield tuples containing (chunk_filename, bytes_written), where
            chunk_filename is encoded as a PNG file.'''
-        for chunk_filename, bytes_written in self._append(*args):
+        for chunk_filename, bytes_written in self._append(filename):
             # TODO Metadata happens here?
             # A simple png encoding layer on top of _append.
             tmp = self.enc.encode(chunk_filename) 
@@ -23,25 +25,28 @@ class FlickrFS(object):
             # Delete the intermediate blob.
             os.unlink(chunk_filename)
 
-    def _append(self, blob_filename, offset, data_filename):
+    def _append(self, filename):
         '''Yield tuples containing (chunk_filename, bytes_written).'''
-        with open(data_filename) as data:
+        with open(filename) as data:
             while True:
-                # Use a new temp file if blob_filename is None.
-                if blob_filename is None:
-                    blob_filename = tempfile.mktemp()
+                # Use a new temp file if no blob is specified.
+                if self.current_blob is None:
+                    self.current_blob = tempfile.mktemp()
 
                 # Append to the blob.
-                with open(blob_filename, 'w+') as blob:
-                    blob.seek(offset)
-                    chunk = data.read(self.enc.chunk_size - offset)
+                with open(self.current_blob, 'w+') as blob:
+                    blob.seek(self.current_offset)
+                    n = self.enc.chunk_size - self.current_offset
+                    chunk = data.read(n)
                     if not chunk:
                         break
                     blob.write(chunk)
-                yield blob_filename, len(chunk)
+                    self.current_offset += len(chunk)
+                    self.current_offset %= self.enc.chunk_size
+                yield self.current_blob, len(chunk)
 
                 # Reset filename and offset, and repeat.
-                blob_filename, offset = None, 0
+                self.current_blob, self.current_offset, = None, 0
 
 
 class PngEncoder(object):
@@ -73,6 +78,19 @@ class PngEncoder(object):
                 # Delete intermediate tempfile.
                 os.unlink(filename)
         return tmp
+
+    def _create_image(self):
+        '''Create a PIL image that the converted PNG will be stored in.'''
+        raise NotImplementedError
+
+    def _encode_data(self, img, data):
+        '''Encode `data` into the PIL image `img`.'''
+        raise NotImplementedError
+
+    def _decode_data(self, out, img, start, end):
+        '''Write the data stored in `img` from `start` to `end` into `out`.'''
+        raise NotImplementedError
+
 
 
 class NaiveEncoder(PngEncoder):
@@ -175,17 +193,19 @@ if __name__ == '__main__':
           ]
     for fs in fss:
         result = StringIO.StringIO()
-        fname = None
-        offset = 0
-        for filename, n in fs.append(fname, offset, 'README.md'):
-            tmp = fs.enc.decode((filename, offset, n))
+        # Save just enough metadata to decode files.
+        last_blob = None
+        last_offset = fs.current_offset
+        for filename, n in fs.append('README.md'):
+            tmp = fs.enc.decode((filename, last_offset, n))
             with open(tmp) as f:
                 result.write(f.read())
-            if fname != tmp and fname is not None:
-                os.unlink(fname)
-            fname = tmp
-            offset += n
-            offset %= fs.enc.chunk_size
+            # Delete old blobs.
+            if last_blob != tmp and last_blob is not None:
+                os.unlink(last_blob)
+            # Update metadata.
+            last_blob = tmp
+            last_offset = fs.current_offset
         with open('README.md') as f:
             assert f.read() == result.getvalue(), 'It does not work :O'
             print fs.enc.__class__.__name__, 'works! :D'
