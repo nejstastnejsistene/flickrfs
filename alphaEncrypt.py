@@ -47,8 +47,8 @@ if __name__ == '__main__':
         hiding_pix = hide_behind.load()
         encrypted_pix = img.load()
 
-        print hiding_pix[10,20]
-        print encrypted_pix[1,20]
+        # print hiding_pix[10,20]
+        # print encrypted_pix[1,20]
 
         width = hide_behind.size[0]
         height = hide_behind.size[1]
