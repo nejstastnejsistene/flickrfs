@@ -9,7 +9,7 @@ import requests
 
 from flickrapi import FlickrAPI
 
-URL = 'http://fuflickr.cloudapp.net'
+URL = 'fuflickr.cloudapp.net'
 NAME = 'FlickrFS'
 FILE_KEY = '{0}|files'
 
@@ -102,6 +102,10 @@ class FStore(object):
     def get_files(self):
         '''Returns list of users filenames'''
         return self.redis.hkeys(FILE_KEY.format(self.user))
+
+    def get_files_metadata(self):
+        '''Returns all file metadata for this user'''
+        return self.redis.hgetall(FILE_KEY.format(self.user))
 
     def delete_user(self):
         '''Removes a user's metadata'''
