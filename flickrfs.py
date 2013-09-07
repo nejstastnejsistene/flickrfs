@@ -4,34 +4,53 @@ import tempfile
 from PIL import Image
 
 
-CHUNK_SIZE = 2**25 # 32MB
-
+def mktemp():
+    return tempfile.mktemp(prefix='flickrfs_')
 
 class FlickrFS(object):
 
     def __init__(self, enc_cls, *args):
         self.enc = enc_cls(*args) # FIXME
+        self.files = {}
         self.current_blob = None
+        self.current_blob_id = None
         self.current_offset = 0
 
+    def __getitem__(self, key):
+        if isinstance(key, basestring):
+            # Retrive a file.
+            return self.enc.decode(*self.files[key])
+
+    def add(self, filename):
+        for filename, blob_id in self.append(filename):
+            print 'uploading', filename, 'to', blob_id
+            # if blob_id is None
+            #   create new file in flickr and save the blob_id
+            # else
+            #   update blog_id
+            # os.ulink(filename)
+
     def append(self, filename):
-        '''Yield tuples containing (chunk_filename, bytes_written), where
-           chunk_filename is encoded as a PNG file.'''
-        for chunk_filename, bytes_written in self._append(filename):
-            # TODO Metadata happens here?
+        '''Yield tuples containing (blob_filename, blob_id),
+           where blob_filename is encoded as a PNG file.'''
+        if filename in self.files:
+            raise KeyError, "file '{}' already exists".format(filename)
+        self.files[filename] = []
+        for blob_filename, blob_id in self._append(filename):
             # A simple png encoding layer on top of _append.
-            tmp = self.enc.encode(chunk_filename) 
-            yield tmp, bytes_written
+            tmp = self.enc.encode(blob_filename) 
+            yield tmp, blob_id
+            self.files[filename][-1][0] = tmp # FIXME
             # Delete the intermediate blob.
-            os.unlink(chunk_filename)
+            os.unlink(blob_filename)
 
     def _append(self, filename):
-        '''Yield tuples containing (chunk_filename, bytes_written).'''
+        '''Yield tuples containing (blob_filename, blob_id).'''
         with open(filename) as data:
             while True:
                 # Use a new temp file if no blob is specified.
                 if self.current_blob is None:
-                    self.current_blob = tempfile.mktemp()
+                    self.current_blob = mktemp()
 
                 # Append to the blob.
                 with open(self.current_blob, 'w+') as blob:
@@ -41,12 +60,20 @@ class FlickrFS(object):
                     if not chunk:
                         break
                     blob.write(chunk)
+
+                    # Append this chunk to the filename.
+                    self.files[filename].append([self.current_blob_id,
+                        self.current_offset, len(chunk)])
+
+                    # Update the offset.
                     self.current_offset += len(chunk)
                     self.current_offset %= self.enc.chunk_size
-                yield self.current_blob, len(chunk)
 
-                # Reset filename and offset, and repeat.
-                self.current_blob, self.current_offset, = None, 0
+                yield self.current_blob, self.current_blob_id
+
+                if self.current_offset == 0:
+                    self.current_blob = None
+                    self.current_blob_id = None
 
 
 class PngEncoder(object):
@@ -62,13 +89,13 @@ class PngEncoder(object):
         with open(filename) as f:
             self._encode_data(img, f.read())
         # Save to a temporary file.
-        tmp = tempfile.mktemp() + '.png'
+        tmp = mktemp() + '.png'
         img.save(tmp, 'png')
         return tmp
 
     def decode(self, *chunks):
         # Open a new temp file.
-        tmp = tempfile.mktemp()
+        tmp = mktemp()
         with open(tmp, 'w+') as output:
             # Iterate through chunks.
             for filename, start, end in chunks:
@@ -250,22 +277,9 @@ if __name__ == '__main__':
           , FlickrFS(LowBitEncoder, 'favicon.jpg')
           , FlickrFS(DoubleEncoder, 'favicon.jpg')
           ]
+    testfile = 'README.md'
     for fs in fss:
-        result = StringIO.StringIO()
-        # Save just enough metadata to decode files.
-        last_blob = None
-        last_offset = fs.current_offset
-        for filename, n in fs.append('README.md'):
-            tmp = fs.enc.decode((filename, last_offset, n))
-            with open(tmp) as f:
-                result.write(f.read())
-            # Delete old blobs.
-            if last_blob != tmp and last_blob is not None:
-                os.unlink(last_blob)
-            # Update metadata.
-            last_blob = tmp
-            last_offset = fs.current_offset
-            #print result.getvalue()
-        with open('README.md') as f:
-            assert f.read() == result.getvalue(), 'It does not work :O'
-            print fs.enc.__class__.__name__, 'works! :D'
+        fs.add(testfile)
+        with open(fs[testfile]) as result, open(testfile) as control:
+            assert result.read() == control.read()
+
