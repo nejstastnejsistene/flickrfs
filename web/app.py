@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import os
-import requests
 
 from flickrapi import FlickrAPI
 from datastore import Datastore
@@ -13,20 +12,21 @@ app = Flask(__name__)
 
 @app.route('/')
 def register():
-    # if no cookie, redirect to flikr auth
+    # if no cookie, redirect to flickr auth
     # else, ???
     return redirect(flickr.web_login_url('delete'))
 
 @app.route('/flickr')
-def flikr_callback():
+def flickr_callback():
     frob = request.args.get('frob','')
     token = flickr.get_token(frob)
 
-    username = flickr.test_login()[0].attrib.get('id','')
+    user_xml = flickr.test_login()[0]
+    uid = user_xml.attrib.get('id','')
+    username = user_xml[0].text
 
-    db.put_profile(username, {'token': token})
-    # set cookie to know that user is auth'd?
-    return 'Ok'
+    db.put_profile({'token': token, 'uid': uid}, username)
+    return redirect('http://github.com/brcooley/pennapps')
 
 if __name__ == '__main__':
     api_key = os.environ.get('FLICKR_API_KEY','')
