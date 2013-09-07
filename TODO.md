@@ -27,6 +27,7 @@
 
  + Implement automatic flushing of metadata to special Flickr pic, allow CLI client to initialize DB from this instead of our servers
  + Encrypt data if requested (?)
+    + As I described above I don't believe a CLI is feasible with oauth, and I can't think of any "safe" way of handling encryption server-side. I think this is a no go unless Brett feels up to hacking in some javascript AES to do client-side encryption.
  + Build nice UI for webapp
  + Integrate with other API's (?)
  
