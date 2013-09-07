@@ -1,0 +1,9 @@
+{
+    "user_id": {
+        // hash to whatever user data we store
+    },
+    "user_id|files" : {
+        // hash from filename to metadata for this file, as a stringified json obj
+        "my_big_file.txt": "" // format TBD
+    }
+}
