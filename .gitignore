@@ -45,3 +45,6 @@ Vagrantfile
 # Redis
 dump.rdb
 appendonly.aof
+
+# jpegs
+*.jpg
