@@ -288,6 +288,84 @@ class DoubleEncoder(PngEncoder):
             out.write(chr(recovered_byte))
             out.write(chr(bitmap[x, y][3]))
 
+class AlphaEncoder(PngEncoder):
+    '''Save the data in the alpha pixels of an image.'''
+
+    def __init__(self, base_image):
+        base_image = Image.open(base_image)
+        PngEncoder.__init__(self, base_image.size)
+        self.base_image = base_image.load()
+
+    def _create_image(self):
+        return Image.new('RGBA', self.size)
+
+    def _encode_data(self, img, data):
+        bitmap = img.load()
+        width, height = img.size
+        for x in range(width):
+            for y in range(height):
+                #print "acoord:", x, y
+                try:
+                    alpha = ord(data[x * height + y])
+                except IndexError:
+                    #alpha = random.getrandbits(8)
+                    return
+                bitmap[x, y] = self.base_image[x, y] + (alpha,)
+
+    def _decode_data(self, out, img, start, end):
+        bitmap = img.load()
+        height = img.size[1]
+        for i in range(start, end):
+            x, y =  divmod(i, height)
+            out.write(chr(bitmap[x, y][3]))
+
+
+class StealthEncoder(PngEncoder):
+    '''Save the data in the alpha pixels of an image, and adjust the image to look good on flickr'''
+
+    def __init__(self, base_image):
+        base_image = Image.open(base_image)
+        PngEncoder.__init__(self, base_image.size)
+        self.base_image = base_image.load()
+
+    def _create_image(self):
+        return Image.new('RGBA', self.size)
+
+    def _encode_data(self, img, data):
+        bitmap = img.load()
+        width, height = img.size
+        for x in range(width):
+            for y in range(height):
+                #print "acoord:", x, y
+                try:
+                    alpha = ord(data[x * height + y])
+                    adj_r = (255.0/alpha)*(self.base_image[x,y][0] + alpha - 255)
+                    if adj_r < 0:
+                        adj_r = 0
+                    if adj_r > 255:
+                        adj_r = 255
+                    adj_g = (255.0/alpha)*(self.base_image[x,y][1] + alpha - 255)
+                    if adj_g < 0:
+                        adj_g = 0
+                    if adj_g > 255:
+                        adj_g = 255
+                    adj_b = (255.0/alpha)*(self.base_image[x,y][2] + alpha - 255)
+                    if adj_b < 0:
+                        adj_b = 0
+                    if adj_b > 255:
+                        adj_b = 255
+                    bitmap[x,y] = (int(adj_r), int(adj_g), int(adj_b), alpha)
+                except IndexError:
+                    alpha = 255
+                    bitmap[x, y] = self.base_image[x, y] + (alpha,)
+
+                
+    def _decode_data(self, out, img, start, end):
+        bitmap = img.load()
+        height = img.size[1]
+        for i in range(start, end):
+            x, y =  divmod(i, height)
+            out.write(chr(bitmap[x, y][3]))
 
 if __name__ == '__main__':
     import StringIO
@@ -296,6 +374,7 @@ if __name__ == '__main__':
           , FlickrFS(AlphaEncoder('favicon.jpg'), store)
           , FlickrFS(LowBitEncoder('favicon.jpg'), store)
           , FlickrFS(DoubleEncoder('favicon.jpg'), store)
+          , FlickrFS(StealthEncoder('favicon.jpg'), store)
           ]
     testfile = 'README.md'
     for fs in fss:
