@@ -15,3 +15,10 @@ Fall 2013 PennApps
     # /tmp/abcdefgh.png <- a temporary file where the image is stored
     echo ahoj | ./data2png.py | ./png2data.py
     # ahoj <- the temporary file from the intermediate step was deleted
+
+### How everything works together
+
+    cat README.md | ./data2png.py | ./flickr-up.py
+    # 0123456789 <- photo id
+    echo <photo id> | ./flickr-down.py | ./png2data.py
+    # <contents of README.md after round trip>
