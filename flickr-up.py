@@ -10,7 +10,8 @@ token = os.environ.get('FLICKR_ACCESS_TOKEN')
 assert api_key and api_secret and token, (api_key, api_secret, token)
 
 if __name__ == '__main__':
-    filename = sys.stdin.read().strip()
-    flickr = flickrapi.FlickrAPI(api_key, api_secret, token=token)
-    print flickr.upload(filename)[0].text
-    os.unlink(filename)
+    for filename in sys.stdin.read().split():
+        flickr = flickrapi.FlickrAPI(api_key, api_secret, token=token)
+        photo_id = flickr.upload(filename)[0].text
+        print flickr.upload(filename)[0].text
+        os.unlink(filename)

@@ -10,7 +10,7 @@ from PIL import Image
 CHUNK_SIZE = 2**20 # 1MB
 
 
-def encodepng(infile=sys.stdin):
+def encodepng(infile=sys.stdin, chunk_size=CHUNK_SIZE):
     '''Encode data into multiple PNG files.
 
        This reads data from infile (defaulting to stdin) and encodes the raw
@@ -31,7 +31,7 @@ def encodepng(infile=sys.stdin):
     '''
 
     # Read the first chunk.
-    chunk = infile.read(CHUNK_SIZE)
+    chunk = infile.read(chunk_size)
 
     # Run until the end of data.
     while chunk:
@@ -51,7 +51,7 @@ def encodepng(infile=sys.stdin):
         yield outfile
         
         # Read the next chunk.
-        chunk = infile.read(CHUNK_SIZE)
+        chunk = infile.read(chunk_size)
 
 
 def decodepngs(pngfiles, outfile=sys.stdout):
