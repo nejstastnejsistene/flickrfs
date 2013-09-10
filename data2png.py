@@ -5,8 +5,9 @@ import sys
 import tempfile
 from PIL import Image
 
-# Break up large files to avoid flickr's filesize limit.
-CHUNK_SIZE = 128 * 2 ** 20 # 128MB
+# Break up large files to avoid flickr's filesize limit and
+# to quicken upload and download times.
+CHUNK_SIZE = 2**20 # 1MB
 
 
 if __name__ == '__main__':
@@ -19,7 +20,7 @@ if __name__ == '__main__':
         size = int(math.ceil(len(chunk) ** 0.5))
 
         # Create new square grayscale image.
-        img = Image.new('P', (size, size))
+        img = Image.new('L', (size, size))
 
         # Read the chunk into the image, padding with null bytes.
         img.fromstring(chunk.ljust(size*size, '\0'))
