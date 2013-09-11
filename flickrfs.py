@@ -6,7 +6,6 @@ import flickrapi
 import requests
 from PIL import Image
 
-
 # FIXME
 api_key = os.environ.get('FLICKR_API_KEY')
 api_secret = os.environ.get('FLICKR_API_SECRET')
@@ -52,7 +51,7 @@ def encodepng(filename, infile=None, chunk_size=CHUNK_SIZE):
             infile = sys.stdin
 
     # Read the first chunk.
-    part = 0
+    part = 1
     chunk = infile.read(chunk_size)
 
     # Run until the end of data.
@@ -67,7 +66,7 @@ def encodepng(filename, infile=None, chunk_size=CHUNK_SIZE):
         img.fromstring(chunk.ljust(size*size, '\0'))
 
         fname = outfilename
-        if part > 0:
+        if part > 1:
             fname += '.part' + str(part)
         fname += '.png'
         # Yield a file like object containing the png.
