@@ -1,7 +1,7 @@
 import math
 import os
 import sys
-from StringIO import StringIO
+import tempfile
 from PIL import Image
 
 
@@ -10,27 +10,39 @@ from PIL import Image
 CHUNK_SIZE = 2**20 # 1MB
 
 
-def encodepng(infile=sys.stdin, chunk_size=CHUNK_SIZE):
+def encodepng(filename, infile=None, chunk_size=CHUNK_SIZE):
     '''Encode data into multiple PNG files.
 
        This reads data from infile (defaulting to stdin) and encodes the raw
        data into grayscale PNG images. If the data is larger than CHUNK_SIZE,
        The data will be split across multiple PNG files each containing at
        most CHUNK_SIZE data. To handle the multiple image streams, this
-       function returns a generator which yields file-like objects containing
-       PNG images.
+       function returns a generator which yields PNG filenames.
 
-       Example usage, which saves the chunked files to tempfiles:
+       Example usage:
 
        import tempfile
-       for pngfile in encodepng():
-           filename = tempfile.mktemp()
-           with open(filename, 'w+') as f:
-               f.write(pngfile.read())
-           print filename
+       for pngfile in encodepng('README.md'):
+           print pngfile
     '''
 
+    tempdir = tempfile.mktemp(prefix='flickrfs-')
+    os.mkdir(tempdir)
+    basename = os.path.basename(filename)
+    outfilename = os.path.join(tempdir, basename)
+
+    # If infile is not specified try filename if it exists, otherwise
+    # use stdin.
+    close = False
+    if infile is None:
+        try:
+            infile = open(filename)
+            close = True
+        except IOError:
+            infile = sys.stdin
+
     # Read the first chunk.
+    part = 0
     chunk = infile.read(chunk_size)
 
     # Run until the end of data.
@@ -44,14 +56,22 @@ def encodepng(infile=sys.stdin, chunk_size=CHUNK_SIZE):
         # Read the chunk into the image, padding with null bytes.
         img.fromstring(chunk.ljust(size*size, '\0'))
 
+        fname = outfilename
+        if part > 0:
+            fname += '.part' + str(part)
+        fname += '.png'
         # Yield a file like object containing the png.
-        outfile = StringIO()
-        img.save(outfile, 'png')
-        outfile.seek(0)
-        yield outfile
+        with open(fname, 'w+') as outfile:
+            img.save(outfile, 'png')
+        yield fname
         
         # Read the next chunk.
         chunk = infile.read(chunk_size)
+        part += 1
+
+    # Close the file if applicable.
+    if close:
+        infile.close()
 
 
 def decodepngs(pngfiles, outfile=sys.stdout):
@@ -68,7 +88,6 @@ def decodepngs(pngfiles, outfile=sys.stdout):
     '''
 
     for pngfile in pngfiles:
-
         # Open the file as an image.
         img = Image.open(pngfile)
 

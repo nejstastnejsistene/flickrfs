@@ -12,6 +12,5 @@ assert api_key and api_secret and token, (api_key, api_secret, token)
 if __name__ == '__main__':
     for filename in sys.stdin.read().split():
         flickr = flickrapi.FlickrAPI(api_key, api_secret, token=token)
-        photo_id = flickr.upload(filename)[0].text
         print flickr.upload(filename)[0].text
         os.unlink(filename)

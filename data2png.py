@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
-import tempfile
+import sys
 import flickrfs
 
 if __name__ == '__main__':
-    for pngfile in flickrfs.encodepng():
-        filename = tempfile.mktemp()
-        with open(filename, 'w+') as f:
-            f.write(pngfile.read())
-        print filename
+    if len(sys.argv) < 2:
+        sys.stderr.write('Usage: {0}: <filename>'.format(*sys.argv))
+        sys.exit(2)
+    for pngfile in flickrfs.encodepng(sys.argv[1]):
+        print pngfile
