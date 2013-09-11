@@ -2,7 +2,17 @@ import math
 import os
 import sys
 import tempfile
+import flickrapi
+import requests
 from PIL import Image
+
+
+# FIXME
+api_key = os.environ.get('FLICKR_API_KEY')
+api_secret = os.environ.get('FLICKR_API_SECRET')
+token = os.environ.get('FLICKR_ACCESS_TOKEN')
+assert api_key and api_secret and token, (api_key, api_secret, token)
+flickr = flickrapi.FlickrAPI(api_key, api_secret, token=token)
 
 
 # Break up large files to avoid flickr's filesize limit and
@@ -74,22 +84,42 @@ def encodepng(filename, infile=None, chunk_size=CHUNK_SIZE):
         infile.close()
 
 
+def flickrupload(filenames):
+    '''Upload an iterable of filenames to flickr, yielding the photo ids.'''
+    for filename in filenames:
+        yield flickr.upload(filename)[0].text
+        os.unlink(filename)
+
+
+def flickrdownload(photo_ids):
+    '''Download a list of photo ids from flickr, yielding local filenames.'''
+    for photo_id in photo_ids:
+        sizes = flickr.photos_getSizes(photo_id=photo_id)
+        image = requests.get(sizes[0][-1].attrib['source'])
+        filename = tempfile.mktemp('.png')
+        with open(filename, 'w+') as f:
+            f.write(image.content)
+        yield filename
+
+
 def decodepngs(pngfiles, outfile=sys.stdout):
     '''Read in PNG files, and write out the data encoded within them.
 
-       This uses a sequence of PNG file objects (pngfiles) and concatenates
+       This uses a sequence of PNG filenames (pngfiles) and concatenates
        their stored data to outfile (defaulting to stdout).
 
        Example usage:
        
        # Prints to stdout the data encoded within foo.png and bar.png.
-       with open('foo.png') as foo, open('bar.png') as bar:
-           decodepngs([foo, bar])
+       decodepngs(['foo.png', 'bar.png'])
     '''
 
-    for pngfile in pngfiles:
+    for filename in pngfiles:
         # Open the file as an image.
-        img = Image.open(pngfile)
+        img = Image.open(filename)
 
         # Retrieve the contents from within the png.
         outfile.write(img.tostring())
+
+        # Delete the temp file.
+        os.unlink(filename)
